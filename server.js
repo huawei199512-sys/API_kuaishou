@@ -31,6 +31,7 @@ app.get('/', (req, res) => {
   res.json({
     service: 'Kuaishou Video API',
     version: '1.0.0',
+    data_version: '1.1',
     description: '快手视频搜索/详情/评论API - GraphQL + 代理IP',
     mode: '代理IP + GraphQL',
     features: {
