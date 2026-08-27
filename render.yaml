@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: kuaishou-video-api
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: NODE_ENV
+        value: production
