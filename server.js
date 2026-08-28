@@ -30,10 +30,10 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     service: 'Kuaishou Video API',
-    version: '1.0.0',
+    version: '1.1.0',
     data_version: '1.1',
-    description: '快手视频搜索/详情/评论API - GraphQL + 代理IP',
-    mode: '代理IP + GraphQL',
+    description: '快手公开数据搜索/详情/评论API - GraphQL + 代理IP（无需登录）',
+    mode: '代理IP + GraphQL（curl-cffi指纹 + axios降级）',
     features: {
       cookie_required: false,
       proxy_mode: '纯代理模式（强制，不回退直连）',
@@ -59,7 +59,7 @@ app.get('/api/search', async (req, res) => {
     }
     proxyManager.setEnabled(true);
     const result = await scraper.searchVideos(keyword, pcursor, page);
-    res.json(result);
+    res.json({ ...result, data_version: '1.1' });
   } catch (error) {
     console.error('Search error:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -75,7 +75,7 @@ app.get('/api/detail/:photoId', async (req, res) => {
     }
     proxyManager.setEnabled(true);
     const result = await scraper.getVideoDetail(photoId);
-    res.json(result);
+    res.json({ ...result, data_version: '1.1' });
   } catch (error) {
     console.error('Detail error:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -92,7 +92,7 @@ app.get('/api/comments/:photoId', async (req, res) => {
     }
     proxyManager.setEnabled(true);
     const result = await scraper.getVideoComments(photoId, pcursor);
-    res.json(result);
+    res.json({ ...result, data_version: '1.1' });
   } catch (error) {
     console.error('Comments error:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -119,7 +119,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('============================================');
   console.log('  Kuaishou Video API 服务已启动');
   console.log(`  端口: ${PORT}`);
-  console.log('  模式: 代理IP + GraphQL（无需Cookie）');
+  console.log('  模式: 代理IP + GraphQL（curl-cffi指纹 + axios降级，无需Cookie）');
   console.log('  接口:');
   console.log('    GET /api/search?keyword=关键词');
   console.log('    GET /api/detail/:photoId');
@@ -128,15 +128,14 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('============================================');
 
   // 后台初始化代理池
-  setTimeout(async () => {
-    try {
-      console.log('[启动] 后台初始化代理池...');
-      await proxyManager.refreshProxies(true);
+  setTimeout(() => {
+    console.log('[启动] 后台初始化代理池...');
+    proxyManager.refreshProxies(true).then(() => {
       proxyManager.startAutoRefresh(30);
       console.log('[启动] 代理池初始化完成');
-    } catch (e) {
-      console.warn('[启动] 代理池初始化失败:', e.message);
+    }).catch(err => {
+      console.error('[启动] 代理池初始化失败:', err.message);
       proxyManager.startAutoRefresh(30);
-    }
+    });
   }, 1000);
 });

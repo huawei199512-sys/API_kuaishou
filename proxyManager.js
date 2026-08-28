@@ -69,8 +69,9 @@ class ProxyManager {
     const proxyUrl = this.normalizeProxy(proxy);
     if (protocol === 'socks5' || protocol === 'socks4') {
       if (SocksProxyAgent) return new SocksProxyAgent(proxyUrl);
-      return new HttpsProxyAgent('http://0.0.0.0:1');
+      return null; // SOCKS代理不可用时返回null
     }
+    // 目标URL为HTTPS，使用HttpsProxyAgent
     return new HttpsProxyAgent(proxyUrl);
   }
 
@@ -79,7 +80,7 @@ class ProxyManager {
   async fetchFromProxyScrape() {
     try {
       const url = 'https://api.proxyscrape.com/v2/?request=getproxies&protocol=http&timeout=8000&country=all&ssl=all&anonymity=all';
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { timeout: 5000 });
       return response.data.split('\r\n').filter(p => p && p.includes(':')).map(p => p.trim());
     } catch { return []; }
   }
@@ -87,7 +88,7 @@ class ProxyManager {
   async fetchFromGeonode() {
     try {
       const url = 'https://proxylist.geonode.com/api/proxy-list?limit=100&page=1&sort_by=lastChecked&sort_type=desc&protocols=http';
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { timeout: 5000 });
       if (response.data && response.data.data) {
         return response.data.data.map(p => `${p.ip}:${p.port}`).filter(p => p && p !== ':');
       }
@@ -98,7 +99,7 @@ class ProxyManager {
   async fetchFromGeonodePage2() {
     try {
       const url = 'https://proxylist.geonode.com/api/proxy-list?limit=100&page=2&sort_by=lastChecked&sort_type=desc&protocols=http';
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { timeout: 5000 });
       if (response.data && response.data.data) {
         return response.data.data.map(p => `${p.ip}:${p.port}`).filter(p => p && p !== ':');
       }
@@ -109,7 +110,7 @@ class ProxyManager {
   async fetchFromTheSpeedX() {
     try {
       const url = 'https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt';
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { timeout: 5000 });
       return response.data.split('\n').filter(p => p && p.includes(':')).map(p => p.trim());
     } catch { return []; }
   }
@@ -117,7 +118,7 @@ class ProxyManager {
   async fetchFromFreeProxyList() {
     try {
       const url = 'https://raw.githubusercontent.com/fate0/proxylist/master/proxy.list';
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { timeout: 5000 });
       return response.data.split('\n')
         .filter(line => line && line.includes('http'))
         .map(line => { try { return JSON.parse(line); } catch { return null; } })
@@ -129,7 +130,7 @@ class ProxyManager {
   async fetchFromSocksProxyScrape() {
     try {
       const url = 'https://api.proxyscrape.com/v2/?request=getproxies&protocol=socks5&timeout=8000&country=all';
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { timeout: 5000 });
       return response.data.split('\r\n').filter(p => p && p.includes(':')).map(p => `socks5://${p.trim()}`);
     } catch { return []; }
   }
@@ -137,7 +138,7 @@ class ProxyManager {
   async fetchFromTheSpeedXSocks() {
     try {
       const url = 'https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks5.txt';
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { timeout: 5000 });
       return response.data.split('\n').filter(p => p && p.includes(':')).map(p => `socks5://${p.trim()}`);
     } catch { return []; }
   }
@@ -145,7 +146,7 @@ class ProxyManager {
   async fetchFromJetkaiHttp() {
     try {
       const url = 'https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/txt/proxies-http.txt';
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { timeout: 5000 });
       return response.data.split('\n').filter(p => p && p.includes(':')).map(p => p.trim());
     } catch { return []; }
   }
@@ -153,7 +154,7 @@ class ProxyManager {
   async fetchFromJetkaiSocks5() {
     try {
       const url = 'https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/txt/proxies-socks5.txt';
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { timeout: 5000 });
       return response.data.split('\n').filter(p => p && p.includes(':')).map(p => `socks5://${p.trim()}`);
     } catch { return []; }
   }
@@ -161,7 +162,7 @@ class ProxyManager {
   async fetchFromHookzofSocks5() {
     try {
       const url = 'https://raw.githubusercontent.com/hookzof/socks5_list/master/proxy.txt';
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { timeout: 5000 });
       return response.data.split('\n').filter(p => p && p.includes(':')).map(p => `socks5://${p.trim()}`);
     } catch { return []; }
   }
@@ -169,7 +170,7 @@ class ProxyManager {
   async fetchFromHubpAll() {
     try {
       const url = 'https://raw.githubusercontent.com/hubp/online-proxies/main/proxies.txt';
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { timeout: 5000 });
       return response.data.split('\n').filter(p => p && p.includes(':')).map(p => p.trim());
     } catch { return []; }
   }
@@ -177,7 +178,7 @@ class ProxyManager {
   async fetchFromMonosansHttp() {
     try {
       const url = 'https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt';
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { timeout: 5000 });
       return response.data.split('\n').filter(p => p && p.includes(':')).map(p => p.trim());
     } catch { return []; }
   }
@@ -185,7 +186,7 @@ class ProxyManager {
   async fetchFromMonosansSocks5() {
     try {
       const url = 'https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/socks5.txt';
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { timeout: 5000 });
       return response.data.split('\n').filter(p => p && p.includes(':')).map(p => `socks5://${p.trim()}`);
     } catch { return []; }
   }

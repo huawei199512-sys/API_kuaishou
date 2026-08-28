@@ -1,22 +1,44 @@
-// 快手视频爬虫 - GraphQL API + 代理IP
-// 基于MediaCrawler项目逆向分析，使用GraphQL接口
+// 快手公开数据爬虫 - GraphQL API + 代理IP + curl-cffi指纹
+// 采集站点已公开数据，无需登录，robots允许
 // 关键词搜索: visionSearchPhoto
 // 视频详情: visionVideoDetail
 // 视频评论: commentListQuery
 const axios = require('axios');
+const https = require('https');
 const proxyManager = require('./proxyManager');
+
+// 使用curl-cffi模拟真实浏览器TLS指纹（快手反爬必需）
+let CurlCffi = null;
+try { CurlCffi = require('curl-cffi'); } catch { CurlCffi = null; }
+console.log('[Kuaishou] curl-cffi:', CurlCffi ? '可用' : '未安装（降级使用axios，可能触发验证码）');
 
 // ============ GraphQL配置 ============
 const GRAPHQL_URL = 'https://www.kuaishou.com/graphql';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-// 超时与并发策略
-const SINGLE_PROXY_TIMEOUT = 12000;
-const TOTAL_REQUEST_TIMEOUT = 30000;
-const CONCURRENT_PROXIES = 3;
-const MAX_ROUNDS = 5;
+// 快手GraphQL必需的Cookie（从公开项目中提取，无需登录）
+const DEFAULT_COOKIE = [
+  'kpf=PC_WEB',
+  'kpn=KUAISHOU_VISION',
+  'clientid=3',
+  'did=web_d5468278a1e92934b3751f249005ffd3',
+  'client_key=65890b29',
+].join('; ');
 
-// ============ GraphQL查询语句（基于MediaCrawler项目）============
+// 超时与并发策略（适配Render免费版30秒限制）
+const SINGLE_PROXY_TIMEOUT = 8000;
+const TOTAL_REQUEST_TIMEOUT = 20000;
+const CONCURRENT_PROXIES = 3;
+const MAX_ROUNDS = 3;
+
+// 自定义HTTPS Agent（axios降级方案使用）
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 10,
+  rejectUnauthorized: false,
+});
+
+// ============ GraphQL查询语句 ============
 
 // 关键词搜索 - 返回视频列表(含标题/播放量/点赞/封面/作者等)
 const SEARCH_QUERY = `
@@ -230,7 +252,7 @@ query commentListQuery($photoId: String, $pcursor: String) {
 }
 `;
 
-// ============ 代理竞态请求（与1688方案一致）============
+// ============ 代理竞态请求 ============
 async function requestWithProxyRace(requestFn, options = {}) {
   const { concurrentProxies = CONCURRENT_PROXIES, maxRounds = MAX_ROUNDS, totalTimeout = TOTAL_REQUEST_TIMEOUT } = options;
   if (!proxyManager.isEnabled()) {
@@ -253,7 +275,8 @@ async function requestWithProxyRace(requestFn, options = {}) {
     }
     const batch = available.slice(0, concurrentProxies);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), totalTimeout / maxRounds);
+    const roundTimeout = Math.max(SINGLE_PROXY_TIMEOUT, totalTimeout / maxRounds);
+    const timer = setTimeout(() => controller.abort(), roundTimeout);
     try {
       const results = await Promise.allSettled(
         batch.map(async (proxy) => {
@@ -279,7 +302,7 @@ async function requestWithProxyRace(requestFn, options = {}) {
   return { success: false, error: lastError || '所有代理都失败了' };
 }
 
-// ============ GraphQL请求 ============
+// ============ GraphQL请求（优先使用curl-cffi模拟浏览器指纹）============
 async function graphqlRequest(operationName, variables, proxy = null, abortSignal = null) {
   const payload = {
     operationName,
@@ -292,11 +315,65 @@ async function graphqlRequest(operationName, variables, proxy = null, abortSigna
   const headers = {
     'User-Agent': UA,
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
     'Origin': 'https://www.kuaishou.com',
-    'Referer': `https://www.kuaishou.com/`,
+    'Referer': 'https://www.kuaishou.com/',
+    'Cookie': DEFAULT_COOKIE,
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Dest': 'empty',
   };
 
+  // 优先使用curl-cffi（模拟真实浏览器TLS指纹，绕过字节系反爬）
+  if (CurlCffi) {
+    try {
+      const fetchOptions = {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        timeout: SINGLE_PROXY_TIMEOUT,
+        impersonate: 'chrome120',
+      };
+      if (proxy) {
+        // curl-cffi的proxy需要完整URL格式，给HTTP代理添加http://前缀
+        let proxyUrl = proxy;
+        if (!proxyUrl.startsWith('http://') && !proxyUrl.startsWith('https://') && !proxyUrl.startsWith('socks')) {
+          proxyUrl = 'http://' + proxyUrl;
+        }
+        fetchOptions.proxy = proxyUrl;
+      }
+      const resp = await CurlCffi.fetch(GRAPHQL_URL, fetchOptions);
+      if (resp.status !== 200) {
+        return { success: false, error: `HTTP ${resp.status}` };
+      }
+      let data;
+      if (typeof resp.data === 'string') {
+        try {
+          data = JSON.parse(resp.data);
+        } catch {
+          data = resp.data;
+        }
+      } else {
+        data = resp.data;
+      }
+      // 检查是否触发了验证码（result为400002表示风控）
+      if (data && data.data && data.data.result === 400002) {
+        return { success: false, error: '触发风控验证码，换代理重试' };
+      }
+      if (data && data.errors) {
+        return { success: false, error: data.errors[0]?.message || 'GraphQL错误' };
+      }
+      if (!data || !data.data) {
+        return { success: false, error: '响应数据为空' };
+      }
+      return { success: true, data: data.data };
+    } catch (error) {
+      console.log(`[Kuaishou] curl-cffi失败(${error.message}), 降级到axios`);
+    }
+  }
+
+  // 降级方案：使用axios（不带浏览器指纹，成功率较低）
   try {
     const axiosConfig = {
       method: 'POST',
@@ -307,30 +384,41 @@ async function graphqlRequest(operationName, variables, proxy = null, abortSigna
       signal: abortSignal,
       maxRedirects: 3,
       validateStatus: () => true,
+      decompress: true,
+      httpsAgent: httpsAgent,
     };
     if (proxy) {
       const agent = proxyManager.createAgent(proxy);
-      axiosConfig.httpsAgent = agent;
-      axiosConfig.httpAgent = agent;
+      if (agent) {
+        axiosConfig.httpsAgent = agent;
+        axiosConfig.httpAgent = agent;
+      }
     }
     const resp = await axios(axiosConfig);
     if (resp.status !== 200) {
       return { success: false, error: `HTTP ${resp.status}` };
     }
     const data = resp.data;
-    if (data.errors) {
+    // 检查是否触发了验证码
+    if (data && data.data && data.data.result === 400002) {
+      return { success: false, error: '触发风控验证码，换代理重试' };
+    }
+    if (data && data.errors) {
       return { success: false, error: data.errors[0]?.message || 'GraphQL错误' };
+    }
+    if (!data || !data.data) {
+      return { success: false, error: '响应数据为空' };
     }
     return { success: true, data: data.data };
   } catch (error) {
     const isTimeout = error.name === 'CanceledError' || error.name === 'AbortError' ||
-      error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' || error.code === 'ERR_CANCELED';
+      error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' || error.code === 'ERR_CANCELED' ||
+      error.message?.includes('timeout') || error.message?.includes('Timeout');
     return { success: false, error: isTimeout ? '请求超时' : error.message };
   }
 }
 
 // ============ 1. 关键词搜索视频 ============
-// 从 URL 或关键词提取，支持分页
 async function searchVideos(keyword, pcursor = '', page = 'search') {
   console.log(`[Kuaishou] 搜索视频: ${keyword}, pcursor: ${pcursor}`);
   const result = await requestWithProxyRace(async (proxy, signal) => {
