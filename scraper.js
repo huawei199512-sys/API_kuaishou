@@ -1,3 +1,6 @@
+// 设置环境变量忽略自签名证书（免费代理常见问题）
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 // 快手公开数据爬虫 - GraphQL API + 代理IP + curl-cffi指纹
 // 采集站点已公开数据，无需登录，robots允许
 // 关键词搜索: visionSearchPhoto

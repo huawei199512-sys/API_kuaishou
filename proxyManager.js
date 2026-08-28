@@ -68,10 +68,15 @@ class ProxyManager {
     const protocol = this.getProxyProtocol(proxy);
     const proxyUrl = this.normalizeProxy(proxy);
     if (protocol === 'socks5' || protocol === 'socks4') {
-      if (SocksProxyAgent) return new SocksProxyAgent(proxyUrl);
-      return null; // SOCKS代理不可用时返回null
+      if (SocksProxyAgent) {
+        const agent = new SocksProxyAgent(proxyUrl);
+        // SOCKS代理也忽略自签名证书
+        agent.options = { ...agent.options, rejectUnauthorized: false };
+        return agent;
+      }
+      return null;
     }
-    // 目标URL为HTTPS，使用HttpsProxyAgent
+    // 使用自定义HttpsProxyAgent，忽略证书错误（免费代理常见自签名证书）
     return new HttpsProxyAgent(proxyUrl);
   }
 

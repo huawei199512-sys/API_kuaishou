@@ -3,6 +3,9 @@
   "version": "1.1.0",
   "description": "快手公开数据API - 搜索/详情/评论（GraphQL + curl-cffi指纹 + 代理IP）",
   "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
