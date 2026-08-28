@@ -29,10 +29,10 @@ const DEFAULT_COOKIE = [
 ].join('; ');
 
 // 超时与并发策略（适配Render免费版30秒限制）
-const SINGLE_PROXY_TIMEOUT = 8000;
-const TOTAL_REQUEST_TIMEOUT = 20000;
-const CONCURRENT_PROXIES = 3;
-const MAX_ROUNDS = 3;
+const SINGLE_PROXY_TIMEOUT = 14000;
+const TOTAL_REQUEST_TIMEOUT = 25000;
+const CONCURRENT_PROXIES = 2;
+const MAX_ROUNDS = 2;
 
 // 自定义HTTPS Agent（axios降级方案使用）
 const httpsAgent = new https.Agent({
