@@ -283,16 +283,23 @@ async function requestWithProxyRace(requestFn, options = {}) {
     try {
       const results = await Promise.allSettled(
         batch.map(async (proxy) => {
-          const result = await requestFn(proxy, controller.signal);
-          if (result.success) {
-            proxyManager.markSuccess(proxy);
+          try {
+            const result = await requestFn(proxy, controller.signal);
+            if (result.success) {
+              proxyManager.markSuccess(proxy);
+              usedProxies.add(proxy);
+              return result;
+            }
+            proxyManager.markFailed(proxy);
             usedProxies.add(proxy);
-            return result;
+            lastError = result.error || '请求失败';
+            return null;
+          } catch (err) {
+            proxyManager.markFailed(proxy);
+            usedProxies.add(proxy);
+            lastError = err.message || '代理异常';
+            return null;
           }
-          proxyManager.markFailed(proxy);
-          usedProxies.add(proxy);
-          lastError = result.error || '请求失败';
-          return null;
         })
       );
       for (const r of results) {
