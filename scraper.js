@@ -20,13 +20,17 @@ const GRAPHQL_URL = 'https://www.kuaishou.com/graphql';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 // 快手GraphQL必需的Cookie（从公开项目中提取，无需登录）
-const DEFAULT_COOKIE = [
-  'kpf=PC_WEB',
-  'kpn=KUAISHOU_VISION',
-  'clientid=3',
-  'did=web_d5468278a1e92934b3751f249005ffd3',
-  'client_key=65890b29',
-].join('; ');
+// 使用随机did避免被API网关限流
+const getDefaultCookie = () => {
+  const did = 'web_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  return [
+    'kpf=PC_WEB',
+    'kpn=KUAISHOU_VISION',
+    'clientid=3',
+    'did=' + did,
+    'client_key=65890b29',
+  ].join('; ');
+};
 
 // 超时与并发策略（适配Render免费版30秒限制）
 const SINGLE_PROXY_TIMEOUT = 14000;
@@ -325,11 +329,11 @@ async function graphqlRequest(operationName, variables, proxy = null, abortSigna
   const headers = {
     'User-Agent': UA,
     'Content-Type': 'application/json',
-    'Accept': 'application/json, text/plain, */*',
+    'Accept': '*/*',
     'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
     'Origin': 'https://www.kuaishou.com',
     'Referer': 'https://www.kuaishou.com/',
-    'Cookie': DEFAULT_COOKIE,
+    'Cookie': getDefaultCookie(),
     'Sec-Fetch-Site': 'same-origin',
     'Sec-Fetch-Mode': 'cors',
     'Sec-Fetch-Dest': 'empty',

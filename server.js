@@ -30,8 +30,8 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     service: 'Kuaishou Video API',
-    version: '1.1.3',
-    data_version: '1.1',
+    version: '1.1.4',
+    data_version: '1.1.4',
     description: '快手公开数据搜索/详情/评论API - GraphQL + 代理IP（无需登录）',
     mode: '代理IP + GraphQL（curl-cffi指纹 + axios降级）',
     features: {
@@ -59,7 +59,7 @@ app.get('/api/search', async (req, res) => {
     }
     proxyManager.setEnabled(true);
     const result = await scraper.searchVideos(keyword, pcursor, page);
-    res.json({ ...result, data_version: '1.1' });
+    res.json({ ...result, data_version: '1.1.4' });
   } catch (error) {
     console.error('Search error:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -75,7 +75,7 @@ app.get('/api/detail/:photoId', async (req, res) => {
     }
     proxyManager.setEnabled(true);
     const result = await scraper.getVideoDetail(photoId);
-    res.json({ ...result, data_version: '1.1' });
+    res.json({ ...result, data_version: '1.1.4' });
   } catch (error) {
     console.error('Detail error:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -92,7 +92,7 @@ app.get('/api/comments/:photoId', async (req, res) => {
     }
     proxyManager.setEnabled(true);
     const result = await scraper.getVideoComments(photoId, pcursor);
-    res.json({ ...result, data_version: '1.1' });
+    res.json({ ...result, data_version: '1.1.4' });
   } catch (error) {
     console.error('Comments error:', error);
     res.status(500).json({ success: false, error: error.message });
