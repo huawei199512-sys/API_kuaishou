@@ -14,7 +14,7 @@ process.on('uncaughtException', (err) => {
   console.error('[UncaughtException]', err.message);
 });
 process.on('unhandledRejection', (err) => {
-  console.error('[UnhandledRejection]', err && err.message ? err.message : err);
+  console.error('[UncaughtRejection]', err && err.message ? err.message : err);
 });
 
 // ============ 健康检查 ============

@@ -149,7 +149,7 @@ query visionVideoDetail($photoId: String, $type: String, $page: String, $webPage
     author {
       id
       name
-      following
+      follow
       headerUrl
       __typename
     }
@@ -161,14 +161,12 @@ query visionVideoDetail($photoId: String, $type: String, $page: String, $webPage
       realLikeCount
       coverUrl
       photoUrl
-      liked
-      timestamp
-      expTag
-      llsid
-      viewCount
-      videoRatio
-      stereoType
-      musicBlocked
+      photoH265Url
+      coronaCropManifest
+      coronaCropManifestH265
+      croppedPhotoUrl
+      croppedPhotoH265Url
+      videoResource
       manifest {
         mediaType
         businessType
@@ -200,12 +198,13 @@ query visionVideoDetail($photoId: String, $type: String, $page: String, $webPage
         __typename
       }
       manifestH265
-      photoH265Url
-      coronaCropManifest
-      coronaCropManifestH265
-      croppedPhotoH265Url
-      croppedPhotoUrl
-      videoResource
+      timestamp
+      expTag
+      llsid
+      viewCount
+      videoRatio
+      stereoType
+      musicBlocked
       __typename
     }
     tags { type name __typename }
