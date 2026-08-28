@@ -30,7 +30,7 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     service: 'Kuaishou Video API',
-    version: '1.1.0',
+    version: '1.1.3',
     data_version: '1.1',
     description: '快手公开数据搜索/详情/评论API - GraphQL + 代理IP（无需登录）',
     mode: '代理IP + GraphQL（curl-cffi指纹 + axios降级）',

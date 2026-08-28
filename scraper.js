@@ -333,6 +333,9 @@ async function graphqlRequest(operationName, variables, proxy = null, abortSigna
     'Sec-Fetch-Site': 'same-origin',
     'Sec-Fetch-Mode': 'cors',
     'Sec-Fetch-Dest': 'empty',
+    'sec-ch-ua': '"Google Chrome";v="120", "Not=A?Brand";v="8", "Chromium";v="120"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
   };
 
   // 优先使用curl-cffi（模拟真实浏览器TLS指纹，绕过字节系反爬）
@@ -357,15 +360,25 @@ async function graphqlRequest(operationName, variables, proxy = null, abortSigna
       if (resp.status !== 200) {
         return { success: false, error: `HTTP ${resp.status}` };
       }
-      let data;
-      if (typeof resp.data === 'string') {
+      // curl-cffi的data getter自动解析JSON，返回对象或原始字符串
+      const respData = resp.data;
+      if (respData === undefined || respData === null) {
+        return { success: false, error: '响应数据为空' };
+      }
+      let data = respData;
+      // 如果respData是字符串（JSON解析失败），尝试再次解析
+      if (typeof respData === 'string') {
         try {
-          data = JSON.parse(resp.data);
+          data = JSON.parse(respData);
         } catch {
-          data = resp.data;
+          // 返回响应前200字符用于调试
+          const preview = respData.substring(0, 200);
+          return { success: false, error: `响应数据为空（非JSON: ${preview}）` };
         }
-      } else {
-        data = resp.data;
+      }
+      // 检查API网关拒绝（result: 2 表示请求被API网关拒绝，非GraphQL响应）
+      if (data && data.result === 2) {
+        return { success: false, error: '请求被拒绝(result: 2)' };
       }
       // 检查是否触发了验证码（result为400002表示风控）
       if (data && data.data && data.data.result === 400002) {
@@ -409,6 +422,10 @@ async function graphqlRequest(operationName, variables, proxy = null, abortSigna
       return { success: false, error: `HTTP ${resp.status}` };
     }
     const data = resp.data;
+    // 检查API网关拒绝（result: 2 表示请求被API网关拒绝）
+    if (data && data.result === 2) {
+      return { success: false, error: '请求被拒绝(result: 2)' };
+    }
     // 检查是否触发了验证码
     if (data && data.data && data.data.result === 400002) {
       return { success: false, error: '触发风控验证码，换代理重试' };

@@ -1,6 +1,6 @@
 {
   "name": "kuaishou-video-api",
-  "version": "1.1.0",
+  "version": "1.1.3",
   "description": "快手公开数据API - 搜索/详情/评论（GraphQL + curl-cffi指纹 + 代理IP）",
   "main": "server.js",
   "scripts": {
