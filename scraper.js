@@ -33,10 +33,11 @@ const getDefaultCookie = () => {
 };
 
 // 超时与并发策略（适配Render免费版30秒限制）
-const SINGLE_PROXY_TIMEOUT = 14000;
+// 优化策略：增加并发数和轮次，提高找到可用代理的概率
+const SINGLE_PROXY_TIMEOUT = 5000;
 const TOTAL_REQUEST_TIMEOUT = 25000;
-const CONCURRENT_PROXIES = 2;
-const MAX_ROUNDS = 2;
+const CONCURRENT_PROXIES = 5;
+const MAX_ROUNDS = 4;
 
 // 自定义HTTPS Agent（axios降级方案使用）
 const httpsAgent = new https.Agent({
@@ -259,18 +260,25 @@ query commentListQuery($photoId: String, $pcursor: String) {
 }
 `;
 
-// ============ 代理竞态请求 ============
+// ============ 代理竞态请求（含直连回退）============
 async function requestWithProxyRace(requestFn, options = {}) {
   const { concurrentProxies = CONCURRENT_PROXIES, maxRounds = MAX_ROUNDS, totalTimeout = TOTAL_REQUEST_TIMEOUT } = options;
+  const allowDirectFallback = options.allowDirectFallback !== false;
+  
+  // 直连模式（代理禁用时）
   if (!proxyManager.isEnabled()) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), totalTimeout);
     try { return await requestFn(null, controller.signal); }
     finally { clearTimeout(timer); }
   }
+  
   const allProxies = proxyManager.proxies.length > 0 ? proxyManager.proxies : [];
   const usedProxies = new Set();
   let lastError = null;
+  let proxyAttempts = 0;
+  
+  // 代理竞态轮次
   for (let round = 0; round < maxRounds; round++) {
     const available = [];
     for (const p of allProxies) {
@@ -281,6 +289,7 @@ async function requestWithProxyRace(requestFn, options = {}) {
       continue;
     }
     const batch = available.slice(0, concurrentProxies);
+    proxyAttempts += batch.length;
     const controller = new AbortController();
     const roundTimeout = Math.max(SINGLE_PROXY_TIMEOUT, totalTimeout / maxRounds);
     const timer = setTimeout(() => controller.abort(), roundTimeout);
@@ -313,6 +322,24 @@ async function requestWithProxyRace(requestFn, options = {}) {
       }
     } finally { clearTimeout(timer); }
   }
+  
+  // 所有代理都失败后，尝试直连回退
+  if (allowDirectFallback) {
+    console.log(`[Kuaishou] 代理全部失败(${proxyAttempts}个), 尝试直连回退...`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.min(10000, totalTimeout));
+    try {
+      const result = await requestFn(null, controller.signal);
+      if (result.success) {
+        console.log('[Kuaishou] 直连回退成功!');
+        return result;
+      }
+      lastError = result.error || '直连回退失败';
+    } catch (err) {
+      lastError = '直连回退异常: ' + (err.message || err);
+    } finally { clearTimeout(timer); }
+  }
+  
   return { success: false, error: lastError || '所有代理都失败了' };
 }
 
